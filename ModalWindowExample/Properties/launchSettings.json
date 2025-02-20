@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ModalWindowExample (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ModalWindowExample (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
