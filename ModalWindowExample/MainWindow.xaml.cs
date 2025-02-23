@@ -30,7 +30,7 @@ namespace ModalWindowExample
 
         private void myButton_Click(object sender, RoutedEventArgs e)
         {
-            SampleWindow window = new SampleWindow();
+            ModalWindow window = new ModalWindow();
             window.Activate();
         }
     }

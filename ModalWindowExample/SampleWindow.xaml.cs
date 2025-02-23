@@ -25,11 +25,11 @@ namespace ModalWindowExample
     /// <summary>
     /// An empty window that can be used on its own or navigated to within a Frame.
     /// </summary>
-    public sealed partial class SampleWindow : Window
+    public sealed partial class ModalWindow : Window
     {
         private AppWindow appWindow;
 
-        public SampleWindow()
+        public ModalWindow()
         {
             this.InitializeComponent();
 
@@ -41,6 +41,8 @@ namespace ModalWindowExample
             presenter.IsModal = true;
             appWindow.SetPresenter(presenter);
             appWindow.Show();
+
+            Closed += ModalWindow_Closed;
         }
 
         private AppWindow GetAppWindowForCurrentWindow()
@@ -59,11 +61,28 @@ namespace ModalWindowExample
             // Get HWND of the AppWindow
             IntPtr childHwnd = Win32Interop.GetWindowFromWindowId(childAppWindow.Id);
 
-            // Set the owner using SetWindowLongPtr
-            SetWindowLongPtr(childHwnd, -8, parentHwnd); // -8 = GWLP_HWNDPARENT
+            // Attempt to set the owner window (parent), falling back to 32-bit if needed.
+            try
+            {
+                SetWindowLongPtr64(childHwnd, -8, parentHwnd); // -8 = GWLP_HWNDPARENT
+            }
+            catch
+            {
+                SetWindowLongPtr32(childHwnd, -8, parentHwnd); // -8 = GWLP_HWNDPARENT
+            }
         }
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+        // Import the 32-bit version of SetWindowLong for modifying window properties.
+        [DllImport("User32.dll", CharSet = CharSet.Auto, EntryPoint = "SetWindowLong")]
+        public static extern IntPtr SetWindowLongPtr32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        // Import the 64-bit version of SetWindowLongPtr for modifying window properties.
+        [DllImport("User32.dll", CharSet = CharSet.Auto, EntryPoint = "SetWindowLongPtr")]
+        public static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        private void ModalWindow_Closed(object sender, WindowEventArgs args)
+        {
+            App.m_window.Activate();
+        }
     }
 }
