@@ -1,88 +1,76 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
 using WinRT.Interop;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+namespace ModalWindowExample;
 
-namespace ModalWindowExample
+public sealed partial class ModalWindow : Window
 {
-    /// <summary>
-    /// An empty window that can be used on its own or navigated to within a Frame.
-    /// </summary>
-    public sealed partial class ModalWindow : Window
+    private AppWindow appWindow;
+
+    public ModalWindow()
     {
-        private AppWindow appWindow;
+        this.InitializeComponent();
+        appWindow = GetAppWindowForCurrentWindow();
+        OverlappedPresenter presenter = OverlappedPresenter.CreateForDialog();
 
-        public ModalWindow()
+        // Set this modal window's owner (the main application window).
+        SetOwnership(appWindow, App.m_window);
+
+        // Make the window modal (blocks interaction with the owner window until closed).
+        presenter.IsModal = true;
+
+        // Apply the presenter settings to the AppWindow.
+        appWindow.SetPresenter(presenter);
+
+        // Show the modal window.
+        appWindow.Show();
+
+        Closed += ModalWindow_Closed;
+    }
+
+    private AppWindow GetAppWindowForCurrentWindow()
+    {
+        IntPtr hWnd = WindowNative.GetWindowHandle(this);
+        WindowId myWndId = Win32Interop.GetWindowIdFromWindow(hWnd);
+        return AppWindow.GetFromWindowId(myWndId);
+    }
+
+    // Sets the owner window of the modal window.
+    private void SetOwnership(AppWindow childAppWindow, Window ownerWindow)
+    {
+        // Get the HWND (window handle) of the owner window (main window).
+        IntPtr parentHwnd = WindowNative.GetWindowHandle(ownerWindow);
+
+        // Get the HWND of the AppWindow (modal window).
+        IntPtr childHwnd = Win32Interop.GetWindowFromWindowId(childAppWindow.Id);
+
+        // Set the owner window using SetWindowLongPtr for 64-bit systems
+        // or SetWindowLong for 32-bit systems.
+        if (IntPtr.Size == 8) // Check if the system is 64-bit
         {
-            this.InitializeComponent();
-
-            appWindow = GetAppWindowForCurrentWindow();
-
-            var presenter = OverlappedPresenter.CreateForDialog();
-
-            SetOwner(appWindow);
-            presenter.IsModal = true;
-            appWindow.SetPresenter(presenter);
-            appWindow.Show();
-
-            Closed += ModalWindow_Closed;
+            SetWindowLongPtr(childHwnd, -8, parentHwnd); // -8 = GWLP_HWNDPARENT
         }
-
-        private AppWindow GetAppWindowForCurrentWindow()
+        else // 32-bit system
         {
-            IntPtr hWnd = WindowNative.GetWindowHandle(this);
-            WindowId myWndId = Win32Interop.GetWindowIdFromWindow(hWnd);
-            return AppWindow.GetFromWindowId(myWndId);
+            SetWindowLong(childHwnd, -8, parentHwnd);
         }
+    }
 
-        private void SetOwner(AppWindow childAppWindow)
-        {
-            // Get HWND of the main window
-            // The main window can be retrieved from App.xaml.cs if it's set as a static property.
-            IntPtr parentHwnd = WindowNative.GetWindowHandle(App.m_window);
+    // Import the Windows API function SetWindowLongPtr for modifying window properties on 64-bit systems.
+    [DllImport("User32.dll", CharSet = CharSet.Auto, EntryPoint = "SetWindowLongPtr")]
+    public static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
-            // Get HWND of the AppWindow
-            IntPtr childHwnd = Win32Interop.GetWindowFromWindowId(childAppWindow.Id);
+    // Import the Windows API function SetWindowLong for modifying window properties on 32-bit systems.
+    [DllImport("User32.dll", CharSet = CharSet.Auto, EntryPoint = "SetWindowLong")]
+    public static extern IntPtr SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
-            // Attempt to set the owner window (parent), falling back to 32-bit if needed.
-            try
-            {
-                SetWindowLongPtr64(childHwnd, -8, parentHwnd); // -8 = GWLP_HWNDPARENT
-            }
-            catch
-            {
-                SetWindowLongPtr32(childHwnd, -8, parentHwnd); // -8 = GWLP_HWNDPARENT
-            }
-        }
-
-        // Import the 32-bit version of SetWindowLong for modifying window properties.
-        [DllImport("User32.dll", CharSet = CharSet.Auto, EntryPoint = "SetWindowLong")]
-        public static extern IntPtr SetWindowLongPtr32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-        // Import the 64-bit version of SetWindowLongPtr for modifying window properties.
-        [DllImport("User32.dll", CharSet = CharSet.Auto, EntryPoint = "SetWindowLongPtr")]
-        public static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-        private void ModalWindow_Closed(object sender, WindowEventArgs args)
-        {
-            App.m_window.Activate();
-        }
+    private void ModalWindow_Closed(object sender, WindowEventArgs args)
+    {
+        // Reactivate the main application window when the modal window closes.
+        App.m_window.Activate();
     }
 }
